@@ -1,43 +1,17 @@
-const express = require('express');
-let books = require("./booksdb.js");
-let isValid = require("./auth_users.js").isValid;
-let users = require("./auth_users.js").users;
-const public_users = express.Router();
-
-
-public_users.post("/register", (req,res) => {
-  //Write your code here
-  return res.status(300).json({message: "Yet to be implemented"});
-});
-
-// Get the book list available in the shop
-public_users.get('/',function (req, res) {
-  //Write your code here
-  return res.status(300).json({message: "Yet to be implemented"});
-});
-
-// Get book details based on ISBN
-public_users.get('/isbn/:isbn',function (req, res) {
-  //Write your code here
-  return res.status(300).json({message: "Yet to be implemented"});
- });
-  
-// Get book details based on author
-public_users.get('/author/:author',function (req, res) {
-  //Write your code here
-  return res.status(300).json({message: "Yet to be implemented"});
-});
-
-// Get all books based on title
-public_users.get('/title/:title',function (req, res) {
-  //Write your code here
-  return res.status(300).json({message: "Yet to be implemented"});
-});
-
-//  Get book review
-public_users.get('/review/:isbn',function (req, res) {
-  //Write your code here
-  return res.status(300).json({message: "Yet to be implemented"});
-});
-
-module.exports.general = public_users;
+const express=require('express');
+const axios=require('axios');
+const books=require('./booksdb');
+const {isValid,users}=require('./auth_users');
+const router=express.Router();
+router.post('/register',(req,res)=>{const {username,password}=req.body;if(!username||!password||!isValid(username))return res.status(400).json({message:'Invalid or existing username'});users.push({username,password});res.status(200).json({message:'Customer successfully registered. Now you can login'});});
+router.get('/',(req,res)=>res.json(books));
+router.get('/isbn/:isbn',(req,res)=>books[req.params.isbn]?res.json(books[req.params.isbn]):res.status(404).json({message:'Book not found'}));
+router.get('/author/:author',(req,res)=>res.json(Object.fromEntries(Object.entries(books).filter(([,b])=>b.author.toLowerCase()===req.params.author.toLowerCase()))));
+router.get('/title/:title',(req,res)=>res.json(Object.fromEntries(Object.entries(books).filter(([,b])=>b.title.toLowerCase()===req.params.title.toLowerCase()))));
+router.get('/review/:isbn',(req,res)=>books[req.params.isbn]?res.json(books[req.params.isbn].reviews):res.status(404).json({message:'Book not found'}));
+const api=axios.create({baseURL:process.env.BOOK_API_URL||'http://localhost:5000'});
+async function getAllBooks(){return (await api.get('/')).data;}
+function getBookByISBN(isbn){return api.get('/isbn/'+encodeURIComponent(isbn)).then(r=>r.data);}
+async function getBooksByAuthor(author){return (await api.get('/author/'+encodeURIComponent(author))).data;}
+function getBooksByTitle(title){return api.get('/title/'+encodeURIComponent(title)).then(r=>r.data);}
+module.exports={general:router,getAllBooks,getBookByISBN,getBooksByAuthor,getBooksByTitle};
