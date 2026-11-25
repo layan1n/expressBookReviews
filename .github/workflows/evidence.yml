@@ -1,0 +1,34 @@
+name: Book API evidence
+on: [push, workflow_dispatch]
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: final_project
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install
+      - name: Exercise API
+        run: |
+          node index.js > /tmp/book-server.log 2>&1 &
+          for i in {1..30}; do curl -fsS http://localhost:5000/ >/dev/null && break; sleep 1; done
+          mkdir -p evidence
+          capture() { local name="$1"; shift; { printf 'curl'; printf ' %q' "$@"; printf '\n'; curl -fsS "$@"; printf '\n'; } | tee "evidence/$name"; }
+          capture getallbooks http://localhost:5000/
+          capture getbooksbyISBN http://localhost:5000/isbn/1
+          capture getbooksbyauthor http://localhost:5000/author/Unknown
+          capture getbooksbytitle http://localhost:5000/title/Things%20Fall%20Apart
+          capture getbookreview http://localhost:5000/review/1
+          capture register -H 'Content-Type: application/json' -d '{"username":"book_demo","password":"DemoOnly123"}' http://localhost:5000/register
+          capture login -c /tmp/book-cookie -H 'Content-Type: application/json' -d '{"username":"book_demo","password":"DemoOnly123"}' http://localhost:5000/customer/login
+          capture reviewadded -b /tmp/book-cookie -X PUT 'http://localhost:5000/customer/auth/review/1?review=Excellent%20book'
+          capture deletereview -b /tmp/book-cookie -X DELETE http://localhost:5000/customer/auth/review/1
+          node -e "const a=require('./router/general');Promise.all([a.getAllBooks(),a.getBookByISBN(1),a.getBooksByAuthor('Unknown'),a.getBooksByTitle('Things Fall Apart')]).then(x=>{if(x.some(v=>!Object.keys(v).length))process.exit(1);console.log('Axios checks passed')}).catch(e=>{console.error(e);process.exit(1)})"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: book-api-evidence
+          path: final_project/evidence
